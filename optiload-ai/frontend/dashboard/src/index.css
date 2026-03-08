@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: #030712; /* gray-950 */
+    --color-card: #0a0f1e;
+    --color-border: rgba(255, 255, 255, 0.08);
+  }
+  
+  * {
+    box-sizing: border-box;
+  }
+  
+  body {
+    background-color: var(--color-bg);
+    color: #f8fafc;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Minimal Scrollbar for Dark modern SaaS */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+  }
+}
+
+@layer components {
+  /* Modern Clean SaaS Card */
+  .glass-card {
+    @apply bg-[#0a0f1e]/80 backdrop-blur-xl border border-white/10 rounded-2xl;
+    box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.5);
+  }
+  
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:border-indigo-500/30 hover:shadow-glow-indigo;
+  }
+  
+  .kpi-card {
+    @apply glass-card p-6 flex flex-col gap-3;
+  }
+  
+  /* Modern Buttons */
+  .btn-primary {
+    @apply px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl 
+           transition-all duration-200 flex items-center justify-center gap-2 text-sm
+           shadow-[0_0_15px_rgba(79,70,229,0.3)] hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .btn-secondary {
+    @apply px-4 py-2.5 bg-[#1e293b] hover:bg-[#334155] text-slate-200 hover:text-white 
+           border border-white/10 font-medium rounded-xl transition-all duration-200 
+           flex items-center justify-center gap-2 text-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  /* Modern Badges */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider;
+  }
+  
+  .badge-green { @apply badge bg-emerald-500/10 text-emerald-400 border border-emerald-500/20; }
+  .badge-blue { @apply badge bg-indigo-500/10 text-indigo-400 border border-indigo-500/20; }
+  .badge-amber { @apply badge bg-amber-500/10 text-amber-400 border border-amber-500/20; }
+  .badge-red { @apply badge bg-rose-500/10 text-rose-400 border border-rose-500/20; }
+  .badge-purple { @apply badge bg-violet-500/10 text-violet-400 border border-violet-500/20; }
+  
+  /* Form Inputs */
+  .input-field {
+    @apply w-full px-4 py-3 bg-[#0a0f1e] border border-white/10 rounded-xl text-white 
+           placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 
+           focus:ring-indigo-500 transition-all duration-200 text-sm shadow-inner;
+  }
+  
+  .section-title {
+    @apply text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4;
+  }
+  
+  /* Skeleton Loading Shimmer */
+  .shimmer {
+    background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+    background-size: 200vw 100%;
+    animation: shimmer 1.5s infinite linear;
+    @apply rounded-md rounded-xl;
+  }
+}
+
+@layer utilities {
+  .text-gradient-indigo {
+    @apply bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent;
+  }
+  .shadow-glow-indigo {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+  }
+  
+  /* Hide scrollbar completely but allow scrolling */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+}
+
+/* Recharts Overrides for Minimal Clean Look */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: rgba(255, 255, 255, 0.05); /* very subtle grid lines */
+}
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: rgba(10, 15, 30, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+  backdrop-filter: blur(16px);
+  padding: 12px 16px !important;
+}
+.recharts-tooltip-item {
+  color: #f8fafc !important;
+  font-weight: 500;
+  font-size: 13px;
+  padding: 2px 0 !important;
+}
+.recharts-text {
+  fill: #64748b; /* slate-500 */
+  font-size: 11px;
+  font-weight: 500;
+}

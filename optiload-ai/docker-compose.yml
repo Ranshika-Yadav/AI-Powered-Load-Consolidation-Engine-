@@ -1,0 +1,311 @@
+version: "3.9"
+
+networks:
+  optiload_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  grafana_data:
+  prometheus_data:
+
+services:
+  # ─────────────────────────── Infrastructure ───────────────────────────
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: optiload_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: optiload
+      POSTGRES_PASSWORD: optiload_secret
+      POSTGRES_DB: optiload_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - optiload_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U optiload"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: optiload_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - optiload_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: optiload_rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: optiload
+      RABBITMQ_DEFAULT_PASS: optiload_rabbit
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - optiload_net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ─────────────────────────── Backend Services ───────────────────────────
+  auth-service:
+    build:
+      context: ./backend/auth-service
+      dockerfile: Dockerfile
+    container_name: optiload_auth
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: super-secret-jwt-key-change-in-production
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+    ports:
+      - "8001:8001"
+    networks:
+      - optiload_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  ingestion-service:
+    build:
+      context: ./backend/ingestion-service
+      dockerfile: Dockerfile
+    container_name: optiload_ingestion
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
+      REDIS_URL: redis://redis:6379/1
+      RABBITMQ_URL: amqp://optiload:optiload_rabbit@rabbitmq:5672/
+      AUTH_SERVICE_URL: http://auth-service:8001
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./data:/app/data
+    networks:
+      - optiload_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  clustering-service:
+    build:
+      context: ./backend/clustering-service
+      dockerfile: Dockerfile
+    container_name: optiload_clustering
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
+      REDIS_URL: redis://redis:6379/2
+      RABBITMQ_URL: amqp://optiload:optiload_rabbit@rabbitmq:5672/
+      AUTH_SERVICE_URL: http://auth-service:8001
+    ports:
+      - "8003:8003"
+    networks:
+      - optiload_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  clustering-worker:
+    build:
+      context: ./backend/clustering-service
+      dockerfile: Dockerfile
+    container_name: optiload_clustering_worker
+    restart: unless-stopped
+    command: celery -A app.celery_app worker --loglevel=info -Q clustering
+    environment:
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
+      REDIS_URL: redis://redis:6379/2
+      RABBITMQ_URL: amqp://optiload:optiload_rabbit@rabbitmq:5672/
+    networks:
+      - optiload_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  optimization-service:
+    build:
+      context: ./backend/optimization-service
+      dockerfile: Dockerfile
+    container_name: optiload_optimization
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
+      REDIS_URL: redis://redis:6379/3
+      RABBITMQ_URL: amqp://optiload:optiload_rabbit@rabbitmq:5672/
+      AUTH_SERVICE_URL: http://auth-service:8001
+    ports:
+      - "8004:8004"
+    networks:
+      - optiload_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  optimization-worker:
+    build:
+      context: ./backend/optimization-service
+      dockerfile: Dockerfile
+    container_name: optiload_optimization_worker
+    restart: unless-stopped
+    command: celery -A app.celery_app worker --loglevel=info -Q optimization
+    environment:
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
+      REDIS_URL: redis://redis:6379/3
+      RABBITMQ_URL: amqp://optiload:optiload_rabbit@rabbitmq:5672/
+    networks:
+      - optiload_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  simulation-service:
+    build:
+      context: ./backend/simulation-service
+      dockerfile: Dockerfile
+    container_name: optiload_simulation
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
+      REDIS_URL: redis://redis:6379/4
+      RABBITMQ_URL: amqp://optiload:optiload_rabbit@rabbitmq:5672/
+      AUTH_SERVICE_URL: http://auth-service:8001
+    ports:
+      - "8005:8005"
+    networks:
+      - optiload_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  analytics-service:
+    build:
+      context: ./backend/analytics-service
+      dockerfile: Dockerfile
+    container_name: optiload_analytics
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
+      REDIS_URL: redis://redis:6379/5
+      AUTH_SERVICE_URL: http://auth-service:8001
+      INGESTION_SERVICE_URL: http://ingestion-service:8002
+      OPTIMIZATION_SERVICE_URL: http://optimization-service:8004
+      SIMULATION_SERVICE_URL: http://simulation-service:8005
+    ports:
+      - "8006:8006"
+    networks:
+      - optiload_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ─────────────────────────── Frontend ───────────────────────────
+  frontend:
+    build:
+      context: ./frontend/dashboard
+      dockerfile: Dockerfile
+    container_name: optiload_frontend
+    restart: unless-stopped
+    environment:
+      VITE_AUTH_URL: http://localhost:8001
+      VITE_INGESTION_URL: http://localhost:8002
+      VITE_CLUSTERING_URL: http://localhost:8003
+      VITE_OPTIMIZATION_URL: http://localhost:8004
+      VITE_SIMULATION_URL: http://localhost:8005
+      VITE_ANALYTICS_URL: http://localhost:8006
+      VITE_MAPBOX_TOKEN: pk.demo_token_replace_with_real
+    ports:
+      - "3000:3000"
+    networks:
+      - optiload_net
+    depends_on:
+      - auth-service
+      - analytics-service
+
+  # ─────────────────────────── Observability ───────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: optiload_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./infra/docker/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    networks:
+      - optiload_net
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: optiload_grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: admin
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/docker/grafana/provisioning:/etc/grafana/provisioning
+      - ./infra/docker/grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3001:3000"
+    networks:
+      - optiload_net
+    depends_on:
+      - prometheus
