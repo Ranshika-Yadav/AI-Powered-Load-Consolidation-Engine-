@@ -1,3 +1,5 @@
+version: "3.9"
+
 networks:
   optiload_net:
     driver: bridge
@@ -13,13 +15,12 @@ services:
   # ─────────────────────────── Infrastructure ───────────────────────────
   postgres:
     image: postgis/postgis:15-3.3
-    platform: linux/amd64
     container_name: optiload_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: optiload
       POSTGRES_PASSWORD: optiload_secret
-      POSTGRES_DB: optiload
+      POSTGRES_DB: optiload_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/docker/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -78,7 +79,7 @@ services:
     container_name: optiload_auth
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: super-secret-jwt-key-change-in-production
       JWT_ALGORITHM: HS256
@@ -100,7 +101,7 @@ services:
     container_name: optiload_ingestion
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
       REDIS_URL: redis://redis:6379/1
       RABBITMQ_URL: amqp://optiload:optiload_rabbit@rabbitmq:5672/
       AUTH_SERVICE_URL: http://auth-service:8001
@@ -125,7 +126,7 @@ services:
     container_name: optiload_clustering
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
       REDIS_URL: redis://redis:6379/2
       RABBITMQ_URL: amqp://optiload:optiload_rabbit@rabbitmq:5672/
       AUTH_SERVICE_URL: http://auth-service:8001
@@ -149,7 +150,7 @@ services:
     restart: unless-stopped
     command: celery -A app.celery_app worker --loglevel=info -Q clustering
     environment:
-      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
       REDIS_URL: redis://redis:6379/2
       RABBITMQ_URL: amqp://optiload:optiload_rabbit@rabbitmq:5672/
     networks:
@@ -169,7 +170,7 @@ services:
     container_name: optiload_optimization
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
       REDIS_URL: redis://redis:6379/3
       RABBITMQ_URL: amqp://optiload:optiload_rabbit@rabbitmq:5672/
       AUTH_SERVICE_URL: http://auth-service:8001
@@ -193,7 +194,7 @@ services:
     restart: unless-stopped
     command: celery -A app.celery_app worker --loglevel=info -Q optimization
     environment:
-      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
       REDIS_URL: redis://redis:6379/3
       RABBITMQ_URL: amqp://optiload:optiload_rabbit@rabbitmq:5672/
     networks:
@@ -213,7 +214,7 @@ services:
     container_name: optiload_simulation
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
       REDIS_URL: redis://redis:6379/4
       RABBITMQ_URL: amqp://optiload:optiload_rabbit@rabbitmq:5672/
       AUTH_SERVICE_URL: http://auth-service:8001
@@ -234,7 +235,7 @@ services:
     container_name: optiload_analytics
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload
+      DATABASE_URL: postgresql://optiload:optiload_secret@postgres:5432/optiload_db
       REDIS_URL: redis://redis:6379/5
       AUTH_SERVICE_URL: http://auth-service:8001
       INGESTION_SERVICE_URL: http://ingestion-service:8002
