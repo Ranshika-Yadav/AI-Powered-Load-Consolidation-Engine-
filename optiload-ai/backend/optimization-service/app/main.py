@@ -20,23 +20,7 @@ from pydantic_settings import BaseSettings
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 import json
 from celery import Celery
-
-# ── Settings ───────────────────────────────────────────────────────────────────
-class Settings(BaseSettings):
-    database_url: str = "postgresql://optiload:optiload_secret@localhost:5432/optiload_db"
-    redis_url: str = "redis://localhost:6379/3"
-    rabbitmq_url: str = "amqp://optiload:optiload_rabbit@localhost:5672/"
-    alpha: float = 0.3   # distance weight
-    beta: float = 0.2    # empty capacity weight
-    gamma: float = 0.2   # trips weight
-    delta: float = 0.2   # carbon weight
-    epsilon: float = 0.1 # delay penalty weight
-    emission_factor: float = 2.68  # kg CO2 per liter diesel
-    class Config:
-        env_file = ".env"
-
-
-settings = Settings()
+from .celery_app import celery_app, settings
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -48,7 +32,6 @@ app = FastAPI(
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 redis_client = redis.from_url(settings.redis_url, decode_responses=True)
-celery_app = Celery("optimization", broker=settings.rabbitmq_url, backend=settings.redis_url)
 
 optimization_runs = Counter("optimization_runs_total", "Optimization runs", ["algorithm"])
 opt_duration = Histogram("optimization_duration_seconds", "Optimization run time")

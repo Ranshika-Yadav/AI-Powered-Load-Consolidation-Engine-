@@ -25,18 +25,7 @@ from pydantic_settings import BaseSettings
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 import json
 from celery import Celery
-
-# ── Settings ──────────────────────────────────────────────────────────────────
-class Settings(BaseSettings):
-    database_url: str = "postgresql://optiload:optiload_secret@localhost:5432/optiload_db"
-    redis_url: str = "redis://localhost:6379/2"
-    rabbitmq_url: str = "amqp://optiload:optiload_rabbit@localhost:5672/"
-
-    class Config:
-        env_file = ".env"
-
-
-settings = Settings()
+from .celery_app import celery_app, settings
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -48,7 +37,6 @@ app = FastAPI(
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 redis_client = redis.from_url(settings.redis_url, decode_responses=True)
-celery_app = Celery("clustering", broker=settings.rabbitmq_url, backend=settings.redis_url)
 
 # ── Metrics ────────────────────────────────────────────────────────────────────
 clusters_created = Counter("clustering_clusters_total", "Clusters created")
